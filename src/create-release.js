@@ -1,6 +1,10 @@
 const core = require('@actions/core');
 const { GitHub, context } = require('@actions/github');
 
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function run() {
   try {
     // Get authenticated GitHub client (Ocktokit): https://github.com/actions/toolkit/tree/master/packages/github#usage
@@ -18,6 +22,34 @@ async function run() {
     const body = core.getInput('body', { required: false });
     const draft = core.getInput('draft', { required: false }) === 'true';
     const prerelease = core.getInput('prerelease', { required: false }) === 'true';
+
+    try {
+      // Get old release with `tag`
+      const oldRelease = await github.repos.getReleaseByTag({
+        owner,
+        repo,
+        tag
+      });
+
+      await github.repos.deleteRelease({
+        owner,
+        repo,
+        release_id: oldRelease.data.id
+      });
+
+      await sleep(10 * 1000);
+
+      // Delete `tag` tag
+      await github.git.deleteRef({
+        owner,
+        repo,
+        ref: `tags/${tag}`
+      });
+
+      await sleep(10 * 1000);
+    } catch (e) {
+      // Do nothing
+    }
 
     // Create a release
     // API Documentation: https://developer.github.com/v3/repos/releases/#create-a-release
